@@ -1,0 +1,77 @@
+[
+    {
+        "question": "How does this library send an HTTP GET request?",
+        "expected_file": "src/requests/api.py",
+        "expected_function": "get"
+    },
+    {
+        "question": "How do I send a POST request with form data?",
+        "expected_file": "src/requests/api.py",
+        "expected_function": "post"
+    },
+    {
+        "question": "Where is the Session class defined?",
+        "expected_file": "src/requests/sessions.py",
+        "expected_function": "Session"
+    },
+    {
+        "question": "How are cookies handled in requests?",
+        "expected_file": "src/requests/cookies.py",
+        "expected_function": null
+    },
+    {
+        "question": "What function parses a URL into its components?",
+        "expected_file": "src/requests/utils.py",
+        "expected_function": null
+    },
+    {
+        "question": "How does the library handle authentication headers?",
+        "expected_file": "src/requests/auth.py",
+        "expected_function": null
+    },
+    {
+        "question": "Where is the Response object defined?",
+        "expected_file": "src/requests/models.py",
+        "expected_function": "Response"
+    },
+    {
+        "question": "How do I install this library?",
+        "expected_file": "README.md",
+        "expected_function": null
+    },
+    {
+        "question": "What exceptions does this library raise on connection errors?",
+        "expected_file": "src/requests/exceptions.py",
+        "expected_function": null
+    },
+    {
+        "question": "How does the request function build a PreparedRequest?",
+        "expected_file": "src/requests/models.py",
+        "expected_function": "prepare"
+    },
+    {
+        "question": "raise_for_status",
+        "expected_file": "src/requests/models.py",
+        "expected_function": "raise_for_status"
+    },
+    {
+        "question": "iter_content",
+        "expected_file": "src/requests/models.py",
+        "expected_function": "iter_content"
+    },
+    {
+        "question": "PreparedRequest class",
+        "expected_file": "src/requests/models.py",
+        "expected_function": "PreparedRequest"
+    },
+    {
+        "question": "HTTPAdapter",
+        "expected_file": "src/requests/adapters.py",
+        "expected_function": "HTTPAdapter"
+    },
+    {
+        "question": "codes lookup table status_codes",
+        "expected_file": "src/requests/status_codes.py",
+        "expected_function": null
+    }
+]
