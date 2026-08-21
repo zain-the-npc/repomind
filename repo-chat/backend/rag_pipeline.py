@@ -10,6 +10,7 @@ import hashlib
 import github_fetch
 import vector_store
 import rerank as reranker
+import query_rewrite
 from embeddings import embed, embed_batch, client
 from chunking.code_chunker import chunk_code_file
 from chunking.doc_chunker import chunk_doc_file
@@ -64,9 +65,10 @@ def _build_prompt(question: str, chunks: list[dict]) -> str:
 
 def query(repo_id: str, question: str) -> dict:
     """Embeds question, hybrid searches, reranks, generates answer with citations."""
-    question_embedding = embed(question)
+    search_query = query_rewrite.rewrite_query(question)
+    question_embedding = embed(search_query)
 
-    candidates = vector_store.hybrid_search(repo_id, question, question_embedding)
+    candidates = vector_store.hybrid_search(repo_id, search_query, question_embedding)
     top_chunks = reranker.rerank(question, candidates, top_k=RERANK_TOP_K)
 
     if not top_chunks:
