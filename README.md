@@ -84,27 +84,13 @@ A hand-written test set (`eval/test_queries.json`) checks whether the expected s
 
 **Honest takeaway:** on this query mix — mostly natural-language questions — dense-only search outperformed hybrid. RRF fusion can down-rank a strong semantic match when BM25 finds no literal keyword overlap and returns unrelated high-lexical-score noise. Hybrid's advantage is concentrated in short, exact-symbol queries (e.g. `HTTPAdapter`, `PreparedRequest class`), where both methods tied. The eval also surfaced a chunking gap: two misses (`raise_for_status`, `iter_content`) were single methods nested inside a class, which the current chunker keeps bundled with the parent class rather than as separately retrievable units.
 
-This is the result of measuring rather than assuming — see [Known Limitations](#known-limitations) for what's next.
+This is the result of measuring rather than assuming.
 
 ## Usage
 
 1. Paste a public GitHub repository URL and index it.
 2. Ask questions in plain English.
 3. Every answer includes clickable citations: file path, function/class name, and line range.
-
-## API
-
-| Route | Method | Body | Returns |
-|---|---|---|---|
-| `/index` | POST | `{ "repo_url": string }` | `{ "repo_id": string }` |
-| `/chat` | POST | `{ "repo_id": string, "question": string }` | `{ "answer": string, "sources": [...] }` |
-| `/health` | GET | — | `{ "status": "ok" }` |
-
-## Known Limitations
-
-- **Chunking granularity:** the Python chunker treats top-level functions and classes as atomic units — a method nested inside a class is not independently retrievable, only reachable as part of the whole class chunk. Tree-sitter chunking for JS/TS/Go/Java/Rust/C/C++ has the same top-level bias, though it correctly handles common patterns like arrow functions, named function expressions, and `module.exports` assignments.
-- **Hybrid search is not a strict upgrade over dense-only search** on natural-language-heavy query sets, per the eval above — it wins specifically on short, exact-symbol queries.
-- **No incremental re-indexing:** re-indexing a repo re-embeds every file from scratch, even if only one file changed.
 
 ## Roadmap
 
