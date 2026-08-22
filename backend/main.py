@@ -1,11 +1,15 @@
 """
-FastAPI app. Two routes:
-  POST /index  {repo_url} -> {repo_id}
-  POST /chat   {repo_id, question} -> {answer, sources}
+FastAPI app. Routes:
+  POST /index         {repo_url} -> {repo_id}
+  POST /chat          {repo_id, question} -> {answer, sources}
+  POST /chat/stream    {repo_id, question} -> text/event-stream (tokens, then sources)
 """
+
+import json
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 import rag_pipeline
@@ -62,6 +66,18 @@ def chat(req: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Query failed: {e}")
     return ChatResponse(**result)
+
+
+@app.post("/chat/stream")
+def chat_stream(req: ChatRequest):
+    def event_generator():
+        try:
+            for event in rag_pipeline.query_stream(req.repo_id, req.question):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'text': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.get("/health")

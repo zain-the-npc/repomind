@@ -63,13 +63,28 @@ def _build_prompt(question: str, chunks: list[dict]) -> str:
     )
 
 
-def query(repo_id: str, question: str) -> dict:
-    """Embeds question, hybrid searches, reranks, generates answer with citations."""
+def _retrieve(repo_id: str, question: str) -> list[dict]:
+    """Shared retrieval step: rewrite -> embed -> hybrid search -> rerank."""
     search_query = query_rewrite.rewrite_query(question)
     question_embedding = embed(search_query)
-
     candidates = vector_store.hybrid_search(repo_id, search_query, question_embedding)
-    top_chunks = reranker.rerank(question, candidates, top_k=RERANK_TOP_K)
+    return reranker.rerank(question, candidates, top_k=RERANK_TOP_K)
+
+
+def _sources_from_chunks(chunks: list[dict]) -> list[dict]:
+    return [
+        {
+            "file": c["file_path"],
+            "function": c.get("function_name"),
+            "lines": f"{c['start_line']}-{c['end_line']}",
+        }
+        for c in chunks
+    ]
+
+
+def query(repo_id: str, question: str) -> dict:
+    """Embeds question, hybrid searches, reranks, generates answer with citations."""
+    top_chunks = _retrieve(repo_id, question)
 
     if not top_chunks:
         return {
@@ -85,16 +100,38 @@ def query(repo_id: str, question: str) -> dict:
     )
     answer = resp.choices[0].message.content
 
-    sources = [
-        {
-            "file": c["file_path"],
-            "function": c.get("function_name"),
-            "lines": f"{c['start_line']}-{c['end_line']}",
-        }
-        for c in top_chunks
-    ]
+    return {"answer": answer, "sources": _sources_from_chunks(top_chunks)}
 
-    return {"answer": answer, "sources": sources}
+
+def query_stream(repo_id: str, question: str):
+    """
+    Generator version of query(). Yields dicts:
+      {"type": "token", "text": "..."}   — one per streamed chunk from the LLM
+      {"type": "sources", "sources": [...]}  — sent once, after streaming finishes
+    main.py wraps this into an SSE response. Kept here (not in main.py) so the
+    retrieval/generation logic has one source of truth for both streaming and
+    non-streaming callers.
+    """
+    top_chunks = _retrieve(repo_id, question)
+
+    if not top_chunks:
+        yield {"type": "token", "text": "No relevant context found in this repo for that question."}
+        yield {"type": "sources", "sources": []}
+        return
+
+    prompt = _build_prompt(question, top_chunks)
+
+    stream = client.chat.completions.create(
+        model=LLM_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        stream=True,
+    )
+    for event in stream:
+        delta = event.choices[0].delta.content
+        if delta:
+            yield {"type": "token", "text": delta}
+
+    yield {"type": "sources", "sources": _sources_from_chunks(top_chunks)}
 
 
 if __name__ == "__main__":
