@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-dotenv
+requests
+openai
+qdrant-client
+fastembed
+tree-sitter
+tree-sitter-languages
