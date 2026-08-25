@@ -9,12 +9,11 @@ import hashlib
 
 import github_fetch
 import vector_store
-import rerank as reranker
 import query_rewrite
 from embeddings import embed, embed_batch, client
 from chunking.code_chunker import chunk_code_file
 from chunking.doc_chunker import chunk_doc_file
-from config import LLM_MODEL, RERANK_TOP_K
+from config import LLM_MODEL, RERANK_TOP_K, ENABLE_RERANK
 
 
 def _repo_id_from_url(repo_url: str) -> str:
@@ -64,10 +63,17 @@ def _build_prompt(question: str, chunks: list[dict]) -> str:
 
 
 def _retrieve(repo_id: str, question: str) -> list[dict]:
-    """Shared retrieval step: rewrite -> embed -> hybrid search -> rerank."""
+    """Shared retrieval step: rewrite -> embed -> hybrid search -> rerank (if enabled)."""
     search_query = query_rewrite.rewrite_query(question)
     question_embedding = embed(search_query)
     candidates = vector_store.hybrid_search(repo_id, search_query, question_embedding)
+
+    if not ENABLE_RERANK:
+        # skip cross-encoder entirely — saves ~200-300MB, needed on memory-constrained
+        # hosting (e.g. Render free tier). Just take the top fused hybrid results directly.
+        return candidates[:RERANK_TOP_K]
+
+    import rerank as reranker  # lazy import: only loads the cross-encoder model if actually used
     return reranker.rerank(question, candidates, top_k=RERANK_TOP_K)
 
 

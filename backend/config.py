@@ -27,3 +27,4 @@ MAX_FILE_SIZE_BYTES = 200_000  # skip huge generated files
 # Retrieval
 HYBRID_TOP_K = 20      # candidates from hybrid search before rerank
 RERANK_TOP_K = 5        # final chunks sent to LLM
+ENABLE_RERANK = os.getenv("ENABLE_RERANK", "true").lower() == "true"
