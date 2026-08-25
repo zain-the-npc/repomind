@@ -55,8 +55,12 @@ def _build_prompt(question: str, chunks: list[dict]) -> str:
     context = "\n\n---\n\n".join(context_blocks)
 
     return (
-        "Answer only using the context below. Cite file path and function name "
-        "for every claim. If the context doesn't contain the answer, say so.\n\n"
+        "Answer using the context below. Cite file path and function name for "
+        "every substantive claim. You may make trivial, obvious inferences "
+        "from visible metadata in the context (e.g. a .py file path means "
+        "Python code) without needing a separate citation for that inference. "
+        "If the context doesn't contain the answer and no reasonable inference "
+        "can be made, say so.\n\n"
         f"Context:\n{context}\n\n"
         f"Question: {question}"
     )
