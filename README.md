@@ -86,6 +86,13 @@ A hand-written test set (`eval/test_queries.json`) checks whether the expected s
 
 This is the result of measuring rather than assuming.
 
+## Live Demo
+
+- Frontend: [repomind-psi-flame.vercel.app](https://repomind-psi-flame.vercel.app)
+- Backend: hosted on Render's free tier
+
+**Note on hosting:** the backend runs on Render's free instance (512MB RAM), which is genuinely tight for an ML-heavy pipeline (embedding model, BM25 index, cross-encoder reranker, and LLM calls all in one request). Expect a 30-60s cold start after idle periods, and occasional instability under memory pressure. This is a free-tier hosting constraint, not an application bug — the same code runs reliably with normal resources. For a guaranteed-stable demo, clone and run locally.
+
 ## Usage
 
 1. Paste a public GitHub repository URL and index it.
@@ -96,8 +103,8 @@ This is the result of measuring rather than assuming.
 
 - Method-level chunking (split class bodies into per-method chunks with class context preserved in metadata)
 - Incremental re-indexing based on file diffs
-- Streaming responses in the chat UI
 - Support for private repositories via authenticated cloning
+- Move backend to a host with more headroom (or add a lighter-weight embedding/rerank path) to remove the free-tier memory ceiling
 
 ## Project Structure
 
