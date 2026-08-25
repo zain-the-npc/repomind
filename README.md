@@ -2,7 +2,7 @@
 
 Paste a GitHub repo. Ask it anything. Get answers with real file + line citations — no hallucinated APIs.
 
-**🔗 Live:** [repomind-psi-flame.vercel.app](https://repomind-psi-flame.vercel.app)
+**🔗 Live:** [rag-repomind.vercel.app](https://rag-repomind.vercel.app)
 *(free-tier backend — first request may take 30-60s to wake up)*
 
 ## Why
