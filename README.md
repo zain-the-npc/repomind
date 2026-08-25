@@ -1,128 +1,66 @@
-# RepoMind
+# 🧠 RepoMind
 
-Chat with any public GitHub repository. Paste a URL, ask questions in plain English, and get answers grounded in the actual codebase — with file and function citations for every claim.
+Paste a GitHub repo. Ask it anything. Get answers with real file + line citations — no hallucinated APIs.
 
-## Overview
+**🔗 Live:** [repomind-psi-flame.vercel.app](https://repomind-psi-flame.vercel.app)
+*(free-tier backend — first request may take 30-60s to wake up)*
 
-RepoMind indexes a repository's code and documentation, then answers natural-language questions about it using retrieval-augmented generation (RAG). Every answer traces back to specific files, functions, and line ranges — no hallucinated APIs, no guessing.
+## Why
 
-The core engineering bet: **exact symbol lookups and natural-language questions need different retrieval strategies.** Asking "what does `raise_for_status` do" and asking "how does this library handle errors" are fundamentally different queries — one needs lexical matching, the other needs semantic understanding. RepoMind runs both in parallel and fuses the results.
+Exact symbol lookups (`raise_for_status`) and natural-language questions ("how does auth work?") need different search strategies — one's lexical, one's semantic. RepoMind runs both and fuses the results, instead of betting on one.
 
-## Architecture
+## How it works
 
 ```
-GitHub URL
-    │
-    ▼
-┌─────────────────┐
-│  Fetch & Filter  │  GitHub Trees API + raw content fetch
-└────────┬─────────┘
-         ▼
-┌─────────────────┐
-│     Chunking     │  AST-based (Python) / tree-sitter (JS, TS, Go, Java, Rust, C/C++)
-└────────┬─────────┘  Docs split by heading
-         ▼
-┌─────────────────┐
-│    Embedding     │  OpenAI text-embedding-3-small
-└────────┬─────────┘
-         ▼
-┌─────────────────┐
-│  Vector Store    │  Qdrant — dense + sparse (BM25) vectors per chunk
-└────────┬─────────┘
-         ▼
-    [ Question ]
-         │
-         ▼
-┌─────────────────┐
-│  Query Rewrite   │  LLM expands vague questions into retrieval-friendly queries
-└────────┬─────────┘
-         ▼
-┌─────────────────┐
-│  Hybrid Search   │  BM25 + dense search, fused via Reciprocal Rank Fusion (RRF)
-└────────┬─────────┘
-         ▼
-┌─────────────────┐
-│    Reranking     │  Cross-encoder (bge-reranker-base) — top 20 → top 5
-└────────┬─────────┘
-         ▼
-┌─────────────────┐
-│    Generation    │  LLM answers strictly from retrieved context, cites sources
-└─────────────────┘
+GitHub URL → Fetch → Chunk (AST + tree-sitter) → Embed → Qdrant
+                                                              │
+Question → Rewrite → Hybrid Search (BM25 + dense, RRF) → Rerank → Answer + citations
 ```
 
-## Tech Stack
+## Stack
 
-| Layer | Choice | Why |
+| Layer | Tool | Why |
 |---|---|---|
-| Backend | FastAPI | Async, typed, minimal boilerplate for a two-route API |
-| Vector DB | Qdrant | Native hybrid search (BM25 + dense) with built-in RRF fusion — no manual fusion logic needed |
-| Embeddings | OpenAI `text-embedding-3-small` | Strong quality-to-cost ratio; one consistent model across indexing and querying |
-| Code chunking | Python `ast` + `tree-sitter` | Real AST parsing per language instead of naive line-splitting; never splits a function mid-body |
-| Reranking | `bge-reranker-base` (cross-encoder) | Free, local, meaningfully improves precision on the final top-5 sent to the LLM |
-| Generation | GPT-4o-mini | Cost-efficient for grounded, citation-constrained answers |
-| Frontend | React + TypeScript + Vite | Fast dev loop, typed API contracts with the backend |
+| Vector DB | Qdrant | Native hybrid search + RRF fusion, no manual plumbing |
+| Embeddings | `text-embedding-3-small` | Solid quality/cost, one model everywhere |
+| Chunking | `ast` (Python) + `tree-sitter` (JS/TS/Go/Java/Rust/C/C++) | Never splits mid-function |
+| Reranking | `bge-reranker-base` | Cross-encoder precision on final top-5 |
+| Backend | FastAPI + SSE streaming | Typed, async, live token streaming |
+| Frontend | React + TypeScript + Vite | — |
 
-## How Hybrid Search Works
+## 📊 The honest eval
 
-Each chunk is stored with two vector representations:
+Ran hybrid vs. vector-only on 15 hand-labeled queries:
 
-- **Dense vector** — semantic embedding, captures meaning and paraphrase ("how do I authenticate" ≈ "sending credentials")
-- **Sparse vector (BM25)** — lexical, captures exact terms ("raise_for_status" matches literally, even with no semantic similarity to the question)
-
-At query time, both searches run in parallel against the same filtered set (scoped to one repo), and Qdrant fuses the two ranked lists using **Reciprocal Rank Fusion (RRF)** — a chunk ranked highly by either method surfaces near the top, without needing to tune relative score weights.
-
-The fused top-20 candidates are then passed through a cross-encoder reranker, which reads the question and each candidate together (rather than comparing precomputed embeddings) for a more precise final top-5.
-
-## Evaluation
-
-A hand-written test set (`eval/test_queries.json`) checks whether the expected source file appears in the top-5 results, comparing hybrid search against dense-only (vector) search.
-
-| Method | Hit rate (top-5, n=15) |
+| Method | Hit rate (top-5) |
 |---|---|
 | Vector-only | 87% |
 | Hybrid (BM25 + dense + RRF) | 73% |
 
-**Honest takeaway:** on this query mix — mostly natural-language questions — dense-only search outperformed hybrid. RRF fusion can down-rank a strong semantic match when BM25 finds no literal keyword overlap and returns unrelated high-lexical-score noise. Hybrid's advantage is concentrated in short, exact-symbol queries (e.g. `HTTPAdapter`, `PreparedRequest class`), where both methods tied. The eval also surfaced a chunking gap: two misses (`raise_for_status`, `iter_content`) were single methods nested inside a class, which the current chunker keeps bundled with the parent class rather than as separately retrievable units.
+Hybrid **didn't** win here — mostly natural-language queries, and BM25 noise dragged RRF down. Hybrid's real edge showed on short exact-symbol queries (`HTTPAdapter`), where it tied vector-only. Also found a chunking gap: nested class methods aren't separately retrievable yet. Measured, not assumed. ✅
 
-This is the result of measuring rather than assuming.
+## ⚠️ Known limitation
 
-## Live Demo
-
-- Frontend: [repomind-psi-flame.vercel.app](https://repomind-psi-flame.vercel.app)
-- Backend: hosted on Render's free tier
-
-**Note on hosting:** the backend runs on Render's free instance (512MB RAM), which is genuinely tight for an ML-heavy pipeline (embedding model, BM25 index, cross-encoder reranker, and LLM calls all in one request). Expect a 30-60s cold start after idle periods, and occasional instability under memory pressure. This is a free-tier hosting constraint, not an application bug — the same code runs reliably with normal resources. For a guaranteed-stable demo, clone and run locally.
-
-## Usage
-
-1. Paste a public GitHub repository URL and index it.
-2. Ask questions in plain English.
-3. Every answer includes clickable citations: file path, function/class name, and line range.
+Hosted on Render's free tier (512MB RAM) — tight for an ML pipeline running embeddings + reranker + LLM per request. Expect cold starts and occasional slowness. Same code, more headroom = solid. Clone locally for guaranteed stability.
 
 ## Roadmap
 
-- Method-level chunking (split class bodies into per-method chunks with class context preserved in metadata)
-- Incremental re-indexing based on file diffs
-- Support for private repositories via authenticated cloning
-- Move backend to a host with more headroom (or add a lighter-weight embedding/rerank path) to remove the free-tier memory ceiling
+- Method-level chunking (per-method, not per-class)
+- Incremental re-indexing on file diffs
+- Private repo support
 
-## Project Structure
+## Structure
 
 ```
-repo-chat/
-├── backend/
-│   ├── main.py              # FastAPI routes
-│   ├── rag_pipeline.py      # index_repo() + query()
-│   ├── github_fetch.py      # repo fetching via GitHub API
-│   ├── chunking/
-│   │   ├── code_chunker.py  # AST (Python) + tree-sitter (multi-language)
-│   │   └── doc_chunker.py   # heading-based markdown/doc splitting
-│   ├── embeddings.py        # OpenAI embedding wrapper
-│   ├── vector_store.py      # Qdrant client, hybrid search
-│   ├── rerank.py            # cross-encoder reranking
-│   └── query_rewrite.py     # LLM query expansion for vague questions
-├── eval/
-│   ├── test_queries.json    # hand-labeled test set
-│   └── run_eval.py          # hybrid vs. vector-only comparison
-└── frontend/                # React + TypeScript chat UI
+backend/
+├── main.py              # FastAPI routes
+├── rag_pipeline.py       # index_repo() + query()
+├── github_fetch.py
+├── chunking/             # AST + tree-sitter
+├── embeddings.py
+├── vector_store.py       # Qdrant hybrid search
+├── rerank.py
+└── query_rewrite.py
+eval/                     # hybrid vs vector-only test
+frontend/                 # React chat UI
 ```
