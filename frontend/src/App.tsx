@@ -20,6 +20,12 @@ export default function App() {
         <p className="tagline">Paste a repo. Ask it anything. Get cited answers.</p>
       </header>
 
+      <div className="hosting-note">
+        Hosted on a free-tier backend — first request after idle time may take
+        30-60s to wake up, and responses can occasionally be slower under load.
+        Not a bug, just free hosting limits.
+      </div>
+
       <main className="app-main">
         {!repoId ? (
           <RepoInput onIndexed={handleIndexed} indexRepo={indexRepo} />

@@ -57,6 +57,17 @@ body {
   flex-direction: column;
 }
 
+.hosting-note {
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: #e3b34114;
+  border: 1px solid #e3b34144;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
 /* Repo input */
 .repo-input {
   display: flex;
